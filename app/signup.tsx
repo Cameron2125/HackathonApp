@@ -34,7 +34,7 @@ export default function SignupScreen() {
       });
 
       alert('Account created successfully!');
-      router.replace('/login');
+      router.replace('/');
     } catch (err: any) {
       setError(err.message);
     }
@@ -57,7 +57,6 @@ export default function SignupScreen() {
           onChangeText={setSchool}
           style={styles.input}
         />
-
         <Text style={styles.label}>Grade Level</Text>
         <Picker
           selectedValue={gradeLevel}

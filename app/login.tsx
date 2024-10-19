@@ -42,7 +42,7 @@ export default function LoginScreen() {
       <Button mode="contained" onPress={handleLogin} style={styles.button}>
         Login
       </Button>
-      <Button onPress={() => router.push('./signup')}>Create an Account</Button>
+      <Button onPress={() => router.replace('./signup')}>Create an Account</Button>
     </View>
   );
 }
