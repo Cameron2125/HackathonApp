@@ -27,8 +27,9 @@ interface Event {
 
 const CalendarPage: React.FC = () => {
   const theme = useTheme();
-  const [view, setView] = useState<'Day' | 'Week' | 'Month'>('Month');
+  const [view, setView] = useState<'Day' | 'Week' | 'Month'>('Day'); //Made default Day - Henry
   const [selectedDate, setSelectedDate] = useState(startOfToday());
+  const [timeOfDay, setTimeOfDay] = useState(new Date()); //added a current time state var - Henry
   const [days, setDays] = useState<Date[]>([]);
   const flatListRef = useRef<FlatList>(null);
 
@@ -54,6 +55,12 @@ const CalendarPage: React.FC = () => {
     setTimeout(() => {
       flatListRef.current?.scrollToIndex({ index: 15, animated: false });
     }, 0);
+
+    const interval = setInterval(() => { //update time of day every 60 seconds - Henry
+      setTimeOfDay(new Date());
+    }, 60000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const handleViewChange = (selectedView: 'Day' | 'Week' | 'Month') => {
@@ -103,7 +110,7 @@ const CalendarPage: React.FC = () => {
           {['Day', 'Week', 'Month'].map((option) => (
             <Button
               key={option}
-              mode={view === option ? 'contained' : 'outlined'}
+              mode={view === option ? 'contained' : 'text'}
               onPress={() => handleViewChange(option as 'Day' | 'Week' | 'Month')}
               style={[
                 styles.selectorButton,
@@ -145,25 +152,43 @@ const CalendarPage: React.FC = () => {
         />
 
         {/* Calendar Layout with Time Column and Events */}
-        <View style={styles.calendar}>
-          <View style={styles.timesColumn}>
-            {Array.from({ length: 24 }, (_, i) => (
-              <Text key={i} style={styles.timeText}>
-                {`${i}:00`}
-              </Text>
-            ))}
-          </View>
-          <ScrollView style={styles.eventsColumn}>
-            {events.map((event) => (
-              <Card key={event.id} style={styles.eventCard}>
-                <Text style={styles.eventText}>{event.name}</Text>
-                <Text style={styles.eventTime}>
-                  {format(event.startTime, 'HH:mm')} - {format(event.endTime, 'HH:mm')}
+        <ScrollView 
+        style={styles.calendarScrollView}
+        contentContainerStyle={{ paddingBottom: 100 }}
+        >
+          <View style={styles.calendar}>
+            {/* Time Column */}
+            <View style={styles.timesColumn}>
+              {Array.from({ length: 24 }, (_, i) => (
+                <Text key={i} style={styles.timeText}>
+                  {`${i}:00`}
                 </Text>
-              </Card>
-            ))}
+              ))}
+              {/*Current Time Bar/ Indicator*/}
+            </View>
+            
+
+            {/* Events Column */}
+            <View style={styles.eventsColumn}>
+              {events.map((event) => (
+                <Card key={event.id} style={styles.eventCard}>
+                  <Text style={styles.eventText}>{event.name}</Text>
+                    <Text style={styles.eventTime}>
+                      {format(event.startTime, 'HH:mm')} - {format(event.endTime, 'HH:mm')}
+                    </Text>
+                  </Card>
+                ))}
+                <View
+                style = {[
+                  styles.currentTimeBar,
+                  {
+                    top: (timeOfDay.getHours() + timeOfDay.getMinutes() / 60) * 60,
+                  },
+                ]}
+                />
+              </View>
+            </View>
           </ScrollView>
-        </View>
       </View>
     </SafeAreaView>
   );
@@ -200,7 +225,7 @@ const styles = StyleSheet.create({
   },
   daysContainer: {
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 5,
   },
   dayText: {
     fontSize: 18,
@@ -214,6 +239,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginTop: 16,
   },
+  
+  calendarScrollView: {
+    flexGrow: 1, // Ensure the scroll view can grow if needed
+    marginTop: 16,
+  },
+
+  currentTimeBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 4, // Adjust the height as necessary
+    backgroundColor: 'red', // Choose your desired color
+  },
+
   timesColumn: {
     width: 80,
     borderRightWidth: 1,
