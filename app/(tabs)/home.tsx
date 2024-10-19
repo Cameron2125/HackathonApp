@@ -4,7 +4,7 @@ import { View, StyleSheet, FlatList, ActivityIndicator, SafeAreaView } from 'rea
 import { Title, Button, FAB, Portal, Provider } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { auth, db } from '../../config/firebaseConfig';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import ClassCard from '../../components/classCards'; 
 import AssignmentCard from '../../components/assignmentCards'; 
 
@@ -152,25 +152,31 @@ export default function HomeScreen() {
 
           <Portal>
             <FAB.Group
-              open={isFabOpen}
-              icon={isFabOpen ? 'close' : 'plus'}
-              color="white"
-              style={styles.fabGroup}
-              actions={[
+                open={isFabOpen}
+                icon={isFabOpen ? 'close' : 'plus'}
+                color="white"
+                style={styles.fabGroup}
+                actions={[
                 {
-                  icon: 'book-open',
-                  label: 'Add Class',
-                  onPress: () => handleFabPress('add-class'),
+                    icon: 'book-open',
+                    label: 'Add Class',
+                    onPress: () => handleFabPress('add-class'),
                 },
                 {
-                  icon: 'plus',
-                  label: 'Add Assignment',
-                  onPress: () => handleFabPress('add-assignment'),
+                    icon: 'plus',
+                    label: 'Add Assignment',
+                    onPress: () => handleFabPress('add-assignment'),
                 },
-              ]}
-              onStateChange={({ open }) => setIsFabOpen(open)}
+                {
+                    icon: 'clipboard-list',
+                    label: 'Add Misc Task',
+                    onPress: () => handleFabPress('add-misc'), // Route to the new misc task page
+                },
+                ]}
+                onStateChange={({ open }) => setIsFabOpen(open)}
             />
-          </Portal>
+        </Portal>
+
         </View>
       </SafeAreaView>
     </Provider>

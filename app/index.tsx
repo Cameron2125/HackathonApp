@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { View, StyleSheet, Image } from 'react-native';
 import { TextInput, Button, Text, Title, Caption } from 'react-native-paper';
 import { useRouter } from 'expo-router';
-import { auth } from '../../config/firebaseConfig';
+import { auth } from '../config/firebaseConfig';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 
 export default function LoginScreen() {
