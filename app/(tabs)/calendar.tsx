@@ -407,7 +407,7 @@ const splitClassByDays = (classItem: Class) => {
     try {
       const user = auth.currentUser;
       if (!user) {
-        router.replace('/login');
+        router.push('/');
         return;
       }
 

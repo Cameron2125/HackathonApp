@@ -16,7 +16,7 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      router.replace('/home'); // Navigate to Home screen after login
+      router.push('/home'); // Navigate to Home screen after login
     } catch (err) {
       setError(err.message);
     }

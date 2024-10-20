@@ -82,7 +82,7 @@ const sortItems = (items: (Class | Assignment)[]): (Class | Assignment)[] => {
     try {
       const user = auth.currentUser;
       if (!user) {
-        router.replace('/login');
+        router.push('/');
         return;
       }
 
@@ -212,7 +212,7 @@ const splitClassByDays = (classItem: Class) => {
 
           )}
 
-          <Button onPress={() => router.replace('/')} style={styles.button}>
+          <Button onPress={() => router.push('/')} style={styles.button}>
             Logout
           </Button>
 

@@ -32,7 +32,7 @@ export default function AddMisc() {
     try {
       const user = auth.currentUser;
       if (!user) {
-        router.replace('/login');
+        router.push('/');
         return;
       }
 

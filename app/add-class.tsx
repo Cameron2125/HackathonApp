@@ -42,7 +42,7 @@ export default function AddClass() {
     try {
       const user = auth.currentUser;
       if (!user) {
-        router.replace('/login');
+        router.push('/');
         return;
       }
 
@@ -57,7 +57,7 @@ export default function AddClass() {
       });
 
       alert('Class added successfully!');
-      router.replace('/home');
+      router.push('/home');
     } catch (err: any) {
       setError(err.message);
     }
