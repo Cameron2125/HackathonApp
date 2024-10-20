@@ -34,6 +34,50 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState<boolean>(true);
   const [isFabOpen, setIsFabOpen] = useState(false);
 
+
+  useEffect(() => {
+    console.log('Items have changed:', items);
+  }, [items]);
+
+  const dayAbbreviations = ['Su', 'M', 'T', 'W', 'Th', 'F', 'Sa'];
+
+// Helper: Create Date object from `daysOfWeek` and `startTime`.
+const createClassDate = (day: string, time: string) => {
+  const today = new Date(); // Use current week
+  const dayIndex = dayAbbreviations.indexOf(day); // Get day index
+
+  // Set the date to the desired day of the week
+  const classDate = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate() + ((7 + dayIndex - today.getDay()) % 7), // Adjust to the correct weekday
+    ...time.split(':').map(Number) // Set hours and minutes
+  );
+  return classDate;
+};
+/**
+ * Function to sort combined items (classes and assignments) by date/time.
+ */
+const sortItems = (items: (Class | Assignment)[]): (Class | Assignment)[] => {
+    return items.sort((a, b) => {
+      let dateA: Date, dateB: Date;
+  
+      if (a.type === 'class') {
+        dateA = createClassDate(a.daysOfWeek[0], a.startTime);
+      } else {
+        dateA = new Date(a.dueDate);
+      }
+  
+      if (b.type === 'class') {
+        dateB = createClassDate(b.daysOfWeek[0], b.startTime);
+      } else {
+        dateB = new Date(b.dueDate);
+      }
+  
+      return dateA.getTime() - dateB.getTime(); // Sort by earliest date/time
+    });
+  };
+
   const fetchItemsForNextWeek = async () => {
     try {
       const user = auth.currentUser;
@@ -61,7 +105,9 @@ export default function HomeScreen() {
       })) as Assignment[];
 
       // Combine and filter for the next 7 days
-      const combinedItems = filterItemsForNextWeek([...fetchedClasses, ...fetchedAssignments]);
+      const combinedItems = sortItems(filterItemsForNextWeek([...fetchedClasses, ...fetchedAssignments]));
+      console.log("COMBINED ITEMSs")
+      console.log(combinedItems)
       setItems(combinedItems);
     } catch (error) {
       console.error('Error fetching items:', error);
@@ -70,34 +116,48 @@ export default function HomeScreen() {
     }
   };
 
+  /**
+ * Given a class object, generate individual instances for each day in `daysOfWeek`.
+ * @param classItem - Class object with `daysOfWeek` and other properties.
+ * @returns Array of individual class instances, one per day in `daysOfWeek`.
+ */
+const splitClassByDays = (classItem: Class) => {
+  // Map each day to a class instance, and return a flat array of class objects.
+  return classItem.daysOfWeek.map((day) => ({
+    ...classItem,
+    daysOfWeek: [day], // Ensure only a single day is included.
+  }));
+};
+  
+  
+
   const filterItemsForNextWeek = (items: CombinedItem[]) => {
     const today = new Date();
     const next7Days = Array.from({ length: 7 }, (_, i) => new Date(today.getTime() + i * 86400000));
     const dayAbbreviations = ['Su', 'M', 'T', 'W', 'Th', 'F', 'Sa'];
 
-    return items.filter((item) => {
-      if (item.type === 'class') {
-        // Check if class occurs in the next 7 days
-        return next7Days.some((date) =>
-          item.daysOfWeek.includes(dayAbbreviations[date.getDay()])
-        );
-      } else {
-        // Check if assignment is due in the next 7 days
-        const dueDate = new Date(item.dueDate);
-        return next7Days.some((date) => date.toDateString() === dueDate.toDateString());
-      }
-    });
+    //console.log("test1")
+    return items.flatMap((item): CombinedItem[] => {
+        if (item.type === 'class') {
+          return splitClassByDays(item); // This returns an array of class objects
+        } else {
+          return [item]; // Wrap assignment in an array to maintain consistency
+        }
+      });
   };
 
   useEffect(() => {
-    fetchItemsForNextWeek();
+    if (items.length == 0){
+        fetchItemsForNextWeek();
+    }
+    
   }, []);
 
   const handleFabPress = (route: string) => {
     router.push(route);
     setIsFabOpen(false);
   };
-
+//a
   const renderItem = ({ item }: { item: CombinedItem }) => {
     if (item.type === 'class') {
       return <ClassCard classData={item} />;
@@ -134,16 +194,22 @@ export default function HomeScreen() {
   return (
     <Provider>
       <SafeAreaView style={styles.safeArea}>
+      <Title style={styles.title}>Classes and Assignments for the Next Week</Title>
         <View style={styles.container}>
-          <Title style={styles.title}>Classes and Assignments for the Next Week</Title>
+         
           {items.length === 0 ? (
             <Title>No upcoming items found.</Title>
           ) : (
             <FlatList
-              data={items}
-              keyExtractor={(item) => item.id}
-              renderItem={renderItem}
-            />
+                data={items}
+                keyExtractor={(item) =>
+                    item.type === 'class'
+                    ? `${item.id}-${item.daysOfWeek.join('-')}` // Unique key for class items
+                    : item.id // Use only id for non-class items
+                }
+                renderItem={renderItem}
+                />
+
           )}
 
           <Button onPress={() => router.replace('/login')} style={styles.button}>
@@ -175,7 +241,7 @@ export default function HomeScreen() {
                 ]}
                 onStateChange={({ open }) => setIsFabOpen(open)}
             />
-        </Portal>
+            </Portal>
 
         </View>
       </SafeAreaView>
@@ -184,6 +250,14 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+    fabContainer: {
+        position: 'absolute',
+        left: 16,
+        bottom: 16,
+        borderRadius: 28, // Optional: Make it more rounded
+        backgroundColor: '#f0f4f7', // Background color
+        padding: 8, // Optional: Add padding for better visual appearance
+      },
   safeArea: {
     flex: 1,
     backgroundColor: '#f0f4f7',
@@ -195,7 +269,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 16,
+    marginBottom: 0,
     textAlign: 'center',
     color: '#1e88e5',
   },

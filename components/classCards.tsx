@@ -1,4 +1,3 @@
-// components/ClassCard.tsx
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Card, Paragraph, Title } from 'react-native-paper';
@@ -6,7 +5,8 @@ import { Card, Paragraph, Title } from 'react-native-paper';
 interface Class {
   id: string;
   name: string;
-  timeOfDay: string;
+  startTime: string;
+  endTime: string;
   daysOfWeek: string[];
   classType: string;
 }
@@ -20,7 +20,9 @@ const ClassCard: React.FC<ClassCardProps> = ({ classData }) => {
     <Card style={styles.card}>
       <Card.Title title={classData.name} subtitle={classData.classType} />
       <Card.Content>
-        <Paragraph>Time: {classData.timeOfDay}</Paragraph>
+        <Paragraph>
+          Time: {classData.startTime} - {classData.endTime}
+        </Paragraph>
         <Paragraph>Days: {classData.daysOfWeek.join(', ')}</Paragraph>
       </Card.Content>
     </Card>

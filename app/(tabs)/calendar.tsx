@@ -9,7 +9,7 @@ import {
   TouchableOpacity, 
   ScrollView 
 } from 'react-native';
-import { Button, Card, useTheme } from 'react-native-paper';
+import { Button, Card, Title, useTheme } from 'react-native-paper';
 import { 
   format, 
   addDays, 
@@ -265,6 +265,7 @@ const CalendarPage: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <Title style={styles.title}>Calendar</Title>
       <View style={styles.container}>
         {/* View Selector */}
         <View style={styles.selector}>
@@ -325,6 +326,7 @@ const styles = StyleSheet.create({
   },
   container: {
     padding: 16,
+    paddingTop: 0,
   },
   selector: {
     flexDirection: 'row',
@@ -349,7 +351,7 @@ const styles = StyleSheet.create({
   },
   daysContainer: {
     alignItems: 'center',
-    paddingVertical: 5,
+
   },
   dayText: {
     fontSize: 18,
@@ -366,7 +368,7 @@ const styles = StyleSheet.create({
   
   calendarScrollView: {
     flexGrow: 1, // Ensure the scroll view can grow if needed
-    marginTop: 16,
+    marginTop: 0,
   },
 
   currentTimeBar: {
@@ -424,7 +426,13 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 8,
   },
-
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'center',
+    color: '#1e88e5',
+  },
 });
 
 export default CalendarPage;
