@@ -212,7 +212,7 @@ const splitClassByDays = (classItem: Class) => {
 
           )}
 
-          <Button onPress={() => router.replace('/login')} style={styles.button}>
+          <Button onPress={() => router.replace('/')} style={styles.button}>
             Logout
           </Button>
 

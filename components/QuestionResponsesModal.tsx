@@ -9,15 +9,20 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
-import { 
-  collection, 
-  getDocs, 
-  query, 
-  where, 
-  deleteDoc, 
-  doc, 
-  addDoc 
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+  deleteDoc,
+  doc,
+  addDoc,
 } from 'firebase/firestore';
 import { db } from '../config/firebaseConfig';
 import QuestionItem from './QuestionItem';
@@ -53,14 +58,12 @@ const QuestionResponsesModal: React.FC<QuestionResponsesModalProps> = ({
 }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
+  const [posting, setPosting] = useState(false);
+  const [newMessage, setNewMessage] = useState('');
 
-  //console.log(question?.QID)
   useEffect(() => {
     if (question) {
       fetchMessages(question.QID);
-    }
-    else{
-        //console.log("Error in 63")
     }
   }, [question, visible]);
 
@@ -68,7 +71,7 @@ const QuestionResponsesModal: React.FC<QuestionResponsesModalProps> = ({
     setLoading(true);
     try {
       const messagesQuery = query(
-        collection(db, 'Messages'), 
+        collection(db, 'Messages'),
         where('QID', '==', QID)
       );
       const querySnapshot = await getDocs(messagesQuery);
@@ -77,10 +80,7 @@ const QuestionResponsesModal: React.FC<QuestionResponsesModalProps> = ({
         ...doc.data(),
       })) as Message[];
 
-      if (fetchedMessages.length === 0) {
-      } else {
-        setMessages(fetchedMessages);
-      }
+      setMessages(fetchedMessages);
     } catch (error) {
       console.error('Error fetching messages:', error);
     } finally {
@@ -88,22 +88,30 @@ const QuestionResponsesModal: React.FC<QuestionResponsesModalProps> = ({
     }
   };
 
-  const addMockMessages = async (QID: string) => {
+  const handleAddMessage = async () => {
+    if (!newMessage.trim()) {
+      Alert.alert('Error', 'Message cannot be empty');
+      return;
+    }
+
+    setPosting(true);
     try {
-      const mockMessages = [
-        { QID, Message: 'This is a great question!', Likes: 3 },
-        { QID, Message: 'I have the same question!', Likes: 1 },
-        { QID, Message: 'Let me help you with this.', Likes: 2 },
-      ];
+      const messageData = {
+        QID: question?.QID,
+        Message: newMessage,
+        Likes: 0,
+      };
+      const docRef = await addDoc(collection(db, 'Messages'), messageData);
 
-      const batch = mockMessages.map(async (msg) =>
-        await addDoc(collection(db, 'Messages'), msg)
-      );
-
-      await Promise.all(batch); // Wait for all mock messages to be added
-      fetchMessages(QID); // Fetch the newly added messages
+      setMessages((prevMessages) => [
+        ...prevMessages,
+        { MID: docRef.id, ...messageData },
+      ]);
+      setNewMessage('');
     } catch (error) {
-      console.error('Error adding mock messages:', error);
+      console.error('Error adding message:', error);
+    } finally {
+      setPosting(false);
     }
   };
 
@@ -119,34 +127,67 @@ const QuestionResponsesModal: React.FC<QuestionResponsesModalProps> = ({
     }
   };
 
+  const dismissKeyboard = () => {
+    Keyboard.dismiss();
+  };
+
   if (!question) return null;
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={styles.modalContainer}>
-        <QuestionItem
-                  question={question}
-                  onRemove={() => { } } showChildren={false}        />
+        <TouchableWithoutFeedback onPress={dismissKeyboard}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.modalContainer}
+          >
+            <View style={styles.header}>
+              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                <Text style={styles.closeButtonText}>←</Text>
+              </TouchableOpacity>
+            </View>
 
-        {loading ? (
-          <ActivityIndicator size="large" style={styles.loading} />
-        ) : (
-          <FlatList
-            data={messages}
-            keyExtractor={(item) => item.MID}
-            renderItem={({ item }) => (
-              <MessageItem message={item} onRemove={handleRemoveMessage} />
+            <QuestionItem question={question} onRemove={() => {}} showChildren={false} />
+
+            {loading ? (
+              <ActivityIndicator size="large" style={styles.loading} />
+            ) : (
+              <FlatList
+                data={messages}
+                keyExtractor={(item) => item.MID}
+                renderItem={({ item }) => (
+                  <MessageItem message={item} onRemove={handleRemoveMessage} />
+                )}
+                ListEmptyComponent={
+                  <Text style={styles.emptyText}>No responses yet</Text>
+                }
+                contentContainerStyle={styles.flatListContent}
+              />
             )}
-            ListEmptyComponent={
-              <Text style={styles.emptyText}>No responses yet</Text>
-            }
-            contentContainerStyle={styles.content}
-          />
-        )}
 
-        <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-          <Text style={styles.closeButtonText}>Close</Text>
-        </TouchableOpacity>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="Type your reply..."
+                value={newMessage}
+                onChangeText={setNewMessage}
+                returnKeyType="send"
+                onSubmitEditing={handleAddMessage}
+              />
+              <TouchableOpacity
+                onPress={handleAddMessage}
+                style={styles.replyButton}
+                disabled={posting}
+              >
+                {posting ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.replyButtonText}>Reply</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+        </TouchableWithoutFeedback>
       </SafeAreaView>
     </Modal>
   );
@@ -157,13 +198,30 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
+  header: {
+ // Added padding to avoid overlap
+    paddingHorizontal: 16,
+    marginBottom: 10,
+  },
+  closeButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'transparent',
+    borderRadius: 16,
+    padding: 8,
+  },
+  closeButtonText: {
+    color: 'black',
+    fontSize: 24,
+  },
+  flatListContent: {
+    flexGrow: 1,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+  },
   loading: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  content: {
-    padding: 16,
   },
   emptyText: {
     textAlign: 'center',
@@ -171,16 +229,29 @@ const styles = StyleSheet.create({
     marginTop: 20,
     fontSize: 16,
   },
-  closeButton: {
-    backgroundColor: '#007bff',
-    padding: 16,
-    borderRadius: 8,
+  inputContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    margin: 16,
+    marginTop: 10,
+    marginBottom: 20,
+    paddingHorizontal: 16,
   },
-  closeButtonText: {
+  input: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 10,
+    marginRight: 8,
+  },
+  replyButton: {
+    backgroundColor: '#28a745',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  replyButtonText: {
     color: '#fff',
-    fontSize: 16,
     fontWeight: 'bold',
   },
 });
