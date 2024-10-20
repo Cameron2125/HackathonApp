@@ -16,11 +16,15 @@ import {
   isSameDay, 
   startOfToday, 
   subDays, 
+  addMinutes,
   startOfMonth, 
   endOfMonth, 
   startOfWeek, 
   endOfWeek 
 } from 'date-fns';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { auth, db } from '@/config/firebaseConfig';
+import { router } from 'expo-router';
 
 interface Event {
   id: string;
@@ -29,6 +33,26 @@ interface Event {
   endTime: Date;
   date: Date;
 }
+interface Assignment {
+  id: string;
+  name: string;
+  dueDate: string;
+  className: string;
+  completed: boolean;
+  type: 'assignment';
+}
+
+interface Class {
+  id: string;
+  name: string;
+  startTime: string;
+  daysOfWeek: string[];
+  classType: string;
+
+  type: 'class';
+}
+type CombinedItem = Assignment | Class;
+
 const DayView: React.FC<{
   selectedDate: Date;
   days: Date[];
@@ -284,8 +308,6 @@ const MonthView: React.FC<{
 };
 
 
-
-
 const CalendarPage: React.FC = () => {
   const theme = useTheme();
   const [view, setView] = useState<'Day' | 'Week' | 'Month'>('Day'); //Made default Day - Henry
@@ -293,6 +315,153 @@ const CalendarPage: React.FC = () => {
   const [timeOfDay, setTimeOfDay] = useState(new Date()); //added a current time state var - Henry
   const [days, setDays] = useState<Date[]>([]);
   const flatListRef = useRef<FlatList>(null);
+
+  const [items, setItems] = useState<Event[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+
+
+  //getting the combined events
+  const dayAbbreviations = ['Su', 'M', 'T', 'W', 'Th', 'F', 'Sa'];
+
+  const createClassDate = (day: string, time: string) => {
+    const today = new Date(); // Use current week
+    const dayIndex = dayAbbreviations.indexOf(day); // Get day index
+    console.log("Day index is")
+    console.log(dayIndex)
+    // Set the date to the desired day of the week
+    const classDate = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate() + ((7 + dayIndex - today.getDay()) % 7), // Adjust to the correct weekday
+      ...time.split(':').map(Number) // Set hours and minutes
+    );
+    return classDate;
+  };
+
+/**
+ * Converts an array of `Class` and `Assignment` objects into `Event` objects.
+ */
+const convertToEvents = (items: (Class | Assignment)[]): Event[] => {
+  const dayAbbreviations = ['Su', 'M', 'T', 'W', 'Th', 'F', 'Sa'];
+
+  return items.flatMap((item) => {
+    if (item.type === 'class') {
+      // Map each day in daysOfWeek to individual Event objects
+      return item.daysOfWeek.map((day) => {
+        const startTime = createClassDate(day, item.startTime);
+        const endTime = addMinutes(startTime, 60); // Assume 1-hour duration
+
+        return {
+          id: `${item.id}-${day}`,
+          name: item.name,
+          startTime,
+          endTime,
+        };
+      });
+    } else if (item.type === 'assignment') {
+      const startTime = new Date(item.dueDate);
+      return [
+        {
+          id: item.id,
+          name: item.name,
+          startTime,
+          endTime: startTime, // Assignments have the same start and end time
+        },
+      ];
+    }
+    return [];
+  });
+};
+
+const splitClassByDays = (classItem: Class) => {
+  // Map each day to a class instance, and return a flat array of class objects.
+  return classItem.daysOfWeek.map((day) => ({
+    ...classItem,
+    daysOfWeek: [day], // Ensure only a single day is included.
+  }));
+
+};
+  
+
+  const sortItems = (items: (Class | Assignment)[]): (Class | Assignment)[] => {
+    return items.sort((a, b) => {
+      let dateA: Date, dateB: Date;
+  
+      if (a.type === 'class') {
+        dateA = createClassDate(a.daysOfWeek[0], a.startTime);
+      } else {
+        dateA = new Date(a.dueDate);
+      }
+  
+      if (b.type === 'class') {
+        dateB = createClassDate(b.daysOfWeek[0], b.startTime);
+      } else {
+        dateB = new Date(b.dueDate);
+      }
+  
+      return dateA.getTime() - dateB.getTime(); // Sort by earliest date/time
+    });
+  };
+
+  const fetchItemsForNextWeek = async () => {
+    try {
+      const user = auth.currentUser;
+      if (!user) {
+        router.replace('/login');
+        return;
+      }
+
+      // Fetch classes
+      const classesQuery = query(collection(db, 'Classes'), where('UID', '==', user.uid));
+      const classSnapshot = await getDocs(classesQuery);
+      const fetchedClasses: Class[] = classSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        type: 'class',
+      })) as Class[];
+
+      // Fetch assignments
+      const assignmentsQuery = query(collection(db, 'Assignments'), where('UID', '==', user.uid));
+      const assignmentSnapshot = await getDocs(assignmentsQuery);
+      const fetchedAssignments: Assignment[] = assignmentSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        type: 'assignment',
+      })) as Assignment[];
+
+      // Combine and filter for the next 7 days
+      const combinedItems = sortItems(filterItemsForNextWeek([...fetchedClasses, ...fetchedAssignments]));
+      console.log("COMBINED ITEMSs")
+      console.log(combinedItems)
+      setItems(convertToEvents(combinedItems));
+    } catch (error) {
+      console.error('Error fetching items:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const filterItemsForNextWeek = (items: CombinedItem[]) => {
+    const today = new Date();
+    const next7Days = Array.from({ length: 7 }, (_, i) => new Date(today.getTime() + i * 86400000));
+    const dayAbbreviations = ['Su', 'M', 'T', 'W', 'Th', 'F', 'Sa'];
+
+    //console.log("test1")
+    return items.flatMap((item): CombinedItem[] => {
+        if (item.type === 'class') {
+          return splitClassByDays(item); // This returns an array of class objects
+        } else {
+          return [item]; // Wrap assignment in an array to maintain consistency
+        }
+      });
+  };
+
+  useEffect(() => {
+    if (items.length == 0){
+        fetchItemsForNextWeek();
+    }
+    
+  }, []);
 
   const events: Event[] = [
     {
@@ -401,7 +570,7 @@ const CalendarPage: React.FC = () => {
             flatListRef={flatListRef}
             renderDay={renderDay}
             handleScroll={handleScroll}
-            events={events}
+            events={items.filter(event => isSameDay(event.startTime, selectedDate))}
             timeOfDay={timeOfDay}
           />
         )}
@@ -412,18 +581,18 @@ const CalendarPage: React.FC = () => {
             flatListRef={flatListRef}
             renderDay={renderDay}
             handleScroll={handleScroll}
-            events={events}
+            events={items}
             timeOfDay={timeOfDay}
             />
         )}
         {view === 'Month' && (
-          <View style={{ height: '100%' }}> 
+          <View style = {{height: '90%'}}>
           <MonthView
-            selectedDate={selectedDate}
-            events={events}
+            selectedDate = {selectedDate}
+            events={items}
             handleDayPress={handleDayPress}
-          />
-        </View>
+            />
+            </View>
         )}
       </View>
     </SafeAreaView>
