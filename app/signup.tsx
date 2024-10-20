@@ -1,12 +1,13 @@
 // app/signup.tsx
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
+import { View, StyleSheet, SafeAreaView } from 'react-native';
 import { TextInput, Button, Text, Title, HelperText } from 'react-native-paper';
 import { Picker } from '@react-native-picker/picker'; // Install Picker
 import { useRouter } from 'expo-router';
 import { auth, db } from '../config/firebaseConfig';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -41,66 +42,72 @@ export default function SignupScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.scrollContainer}>
-      <View style={styles.container}>
-        <Title style={styles.title}>Create an Account</Title>
+    <SafeAreaView style={styles.container}>
+    <KeyboardAwareScrollView
+      contentContainerStyle={styles.scrollContainer}
+      enableOnAndroid={true}  // This ensures the behavior works for Android as well
+      extraScrollHeight={20}   // Adjust this value as needed to prevent the keyboard from blocking the input
+    >
+        <View style={styles.container}>
+          <Title style={styles.title}>Create an Account</Title>
 
-        <TextInput
-          label="Name"
-          value={name}
-          onChangeText={setName}
-          style={styles.input}
-        />
-        <TextInput
-          label="School"
-          value={school}
-          onChangeText={setSchool}
-          style={styles.input}
-        />
-        <Text style={styles.label}>Grade Level</Text>
-        <Picker
-          selectedValue={gradeLevel}
-          onValueChange={(itemValue) => setGradeLevel(itemValue)}
-          style={styles.picker}
-        >
-          <Picker.Item label="Freshman" value="Freshman" />
-          <Picker.Item label="Sophomore" value="Sophomore" />
-          <Picker.Item label="Junior" value="Junior" />
-          <Picker.Item label="Senior" value="Senior" />
-        </Picker>
+          <TextInput
+            label="Name"
+            value={name}
+            onChangeText={setName}
+            style={styles.input}
+          />
+          <TextInput
+            label="School"
+            value={school}
+            onChangeText={setSchool}
+            style={styles.input}
+          />
+          <Text style={styles.label}>Grade Level</Text>
+          <Picker
+            selectedValue={gradeLevel}
+            onValueChange={(itemValue) => setGradeLevel(itemValue)}
+            style={styles.picker}
+          >
+            <Picker.Item label="Freshman" value="Freshman" />
+            <Picker.Item label="Sophomore" value="Sophomore" />
+            <Picker.Item label="Junior" value="Junior" />
+            <Picker.Item label="Senior" value="Senior" />
+          </Picker>
 
-        <TextInput
-          label="Industry Interest (Optional)"
-          value={industryInterest}
-          onChangeText={setIndustryInterest}
-          style={styles.input}
-        />
-        <TextInput
-          label="Email"
-          value={email}
-          onChangeText={setEmail}
-          style={styles.input}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-        <TextInput
-          label="Password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          style={styles.input}
-        />
+          <TextInput
+            label="Industry Interest (Optional)"
+            value={industryInterest}
+            onChangeText={setIndustryInterest}
+            style={styles.input}
+          />
+          <TextInput
+            label="Email"
+            value={email}
+            onChangeText={setEmail}
+            style={styles.input}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+          <TextInput
+            label="Password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            style={styles.input}
+          />
 
-        {error && <HelperText type="error">{error}</HelperText>}
+          {error && <HelperText type="error">{error}</HelperText>}
 
-        <Button mode="contained" onPress={handleSignup} style={styles.button}>
-          Sign Up
-        </Button>
-        <Button onPress={() => router.push('/login')} style={styles.linkButton}>
-          Back to Login
-        </Button>
-      </View>
-    </ScrollView>
+          <Button mode="contained" onPress={handleSignup} style={styles.button}>
+            Sign Up
+          </Button>
+          <Button onPress={() => router.push('/login')} style={styles.linkButton}>
+            Back to Login
+          </Button>
+        </View>
+    </KeyboardAwareScrollView>
+    </SafeAreaView>
   );
 }
 
