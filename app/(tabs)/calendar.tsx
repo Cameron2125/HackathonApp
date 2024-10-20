@@ -25,6 +25,167 @@ interface Event {
   endTime: Date;
 }
 
+const DayView: React.FC<{
+  selectedDate: Date;
+  days: Date[];
+  flatListRef: React.RefObject<FlatList>;
+  renderDay: ({ item }: { item: Date }) => JSX.Element;
+  handleScroll: (event: any) => void;
+  events: Event[];
+  timeOfDay: Date;
+}> = ({
+  selectedDate,
+  days,
+  flatListRef,
+  renderDay,
+  handleScroll,
+  events,
+  timeOfDay,
+}) => {
+  return (
+    <>
+      {/* Infinite Scrolling Days */}
+      <FlatList
+        ref={flatListRef}
+        data={days}
+        horizontal
+        keyExtractor={(item) => item.toISOString()}
+        renderItem={renderDay}
+        showsHorizontalScrollIndicator={false}
+        onScroll={handleScroll}
+        contentContainerStyle={styles.daysContainer}
+        getItemLayout={(_, index) => ({
+          length: 60,
+          offset: 60 * index,
+          index,
+        })}
+      />
+
+      {/* Calendar Layout with Time Column and Events */}
+      <ScrollView
+        style={styles.calendarScrollView}
+        contentContainerStyle={{ paddingBottom: 100 }}
+      >
+        <View style={styles.calendar}>
+          {/* Time Column */}
+          <View style={styles.timesColumn}>
+            {Array.from({ length: 24 }, (_, i) => (
+              <Text key={i} style={styles.timeText}>
+                {`${i}:00`}
+              </Text>
+            ))}
+            {/* Current Time Bar / Indicator */}
+          </View>
+
+          {/* Events Column */}
+          <View style={styles.eventsColumn}>
+            {events.map((event) => (
+              <Card key={event.id} style={styles.eventCard}>
+                <Text style={styles.eventText}>{event.name}</Text>
+                <Text style={styles.eventTime}>
+                  {format(event.startTime, 'HH:mm')} - {format(event.endTime, 'HH:mm')}
+                </Text>
+              </Card>
+            ))}
+            <View
+              style={[
+                styles.currentTimeBar,
+                {
+                  top: (timeOfDay.getHours() + timeOfDay.getMinutes() / 60) * 60,
+                },
+              ]}
+            />
+          </View>
+        </View>
+      </ScrollView>
+    </>
+  );
+};
+
+const WeekView: React.FC<{
+  selectedDate: Date;
+  days: Date[];
+  flatListRef: React.RefObject<FlatList>;
+  renderDay: ({ item }: { item: Date }) => JSX.Element;
+  handleScroll: (event: any) => void;
+  events: Event[];
+  timeOfDay: Date;
+}> = ({
+  selectedDate,
+  days,
+  flatListRef,
+  renderDay,
+  handleScroll,
+  events,
+  timeOfDay,
+}) => {
+  // Filter the current week days (7 days) based on the selectedDate
+  const weekStart = selectedDate; // Start of the current week
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+
+  return (
+    <>
+      {/* Infinite Scrolling Days */}
+      <FlatList
+        ref={flatListRef}
+        data={weekDays}
+        horizontal
+        keyExtractor={(item) => item.toISOString()}
+        renderItem={renderDay}
+        showsHorizontalScrollIndicator={false}
+        onScroll={handleScroll}
+        contentContainerStyle={styles.daysContainer}
+        getItemLayout={(_, index) => ({
+          length: 60,
+          offset: 60 * index,
+          index,
+        })}
+      />
+
+      {/* Calendar Layout with Time Column and Events */}
+      <ScrollView
+        style={styles.calendarScrollView}
+        contentContainerStyle={{ paddingBottom: 100 }}
+      >
+        <View style={styles.calendar}>
+          {/* Time Column */}
+          <View style={styles.timesColumn}>
+            {Array.from({ length: 24 }, (_, i) => (
+              <Text key={i} style={styles.timeText}>
+                {`${i}:00`}
+              </Text>
+            ))}
+          </View>
+
+          {/* Events for each day */}
+          <View style={styles.weekEventsContainer}>
+            {weekDays.map((day) => (
+              <View key={day.toISOString()} style={styles.dayColumn}>
+                <Text style={styles.weekDayText}>{format(day, 'EEE d')}</Text>
+                {events
+                  .filter(
+                    (event) =>
+                      isSameDay(event.startTime, day) || isSameDay(event.endTime, day)
+                  )
+                  .map((event) => (
+                    <Card key={event.id} style={styles.eventCard}>
+                      <Text style={styles.eventText}>{event.name}</Text>
+                      <Text style={styles.eventTime}>
+                        {format(event.startTime, 'HH:mm')} - {format(event.endTime, 'HH:mm')}
+                      </Text>
+                    </Card>
+                  ))}
+              </View>
+            ))}
+          </View>
+        </View>
+      </ScrollView>
+    </>
+  );
+};
+
+
+
 const CalendarPage: React.FC = () => {
   const theme = useTheme();
   const [view, setView] = useState<'Day' | 'Week' | 'Month'>('Day'); //Made default Day - Henry
@@ -125,70 +286,33 @@ const CalendarPage: React.FC = () => {
             </Button>
           ))}
         </View>
-
+  
         {/* Month Title */}
         <Text style={styles.monthText}>{format(selectedDate, 'MMMM yyyy')}</Text>
-
-        {/* Infinite Scrolling Days */}
-        <FlatList
-          ref={flatListRef}
-          data={days}
-          horizontal
-          keyExtractor={(item) => item.toISOString()}
-          renderItem={renderDay}
-          showsHorizontalScrollIndicator={false}
-          onScroll={handleScroll}
-          contentContainerStyle={styles.daysContainer}
-          getItemLayout={(_, index) => ({
-            length: 60,
-            offset: 60 * index,
-            index,
-          })}
-          onScrollToIndexFailed={(info) => {
-            setTimeout(() => {
-              flatListRef.current?.scrollToIndex({ index: info.index, animated: true });
-            }, 100);
-          }}
-        />
-
-        {/* Calendar Layout with Time Column and Events */}
-        <ScrollView 
-        style={styles.calendarScrollView}
-        contentContainerStyle={{ paddingBottom: 100 }}
-        >
-          <View style={styles.calendar}>
-            {/* Time Column */}
-            <View style={styles.timesColumn}>
-              {Array.from({ length: 24 }, (_, i) => (
-                <Text key={i} style={styles.timeText}>
-                  {`${i}:00`}
-                </Text>
-              ))}
-              {/*Current Time Bar/ Indicator*/}
-            </View>
-            
-
-            {/* Events Column */}
-            <View style={styles.eventsColumn}>
-              {events.map((event) => (
-                <Card key={event.id} style={styles.eventCard}>
-                  <Text style={styles.eventText}>{event.name}</Text>
-                    <Text style={styles.eventTime}>
-                      {format(event.startTime, 'HH:mm')} - {format(event.endTime, 'HH:mm')}
-                    </Text>
-                  </Card>
-                ))}
-                <View
-                style = {[
-                  styles.currentTimeBar,
-                  {
-                    top: (timeOfDay.getHours() + timeOfDay.getMinutes() / 60) * 60,
-                  },
-                ]}
-                />
-              </View>
-            </View>
-          </ScrollView>
+  
+        {/* Conditionally render Day, Week, or Month view */}
+        {view === 'Day' && (
+          <DayView
+            selectedDate={selectedDate}
+            days={days}
+            flatListRef={flatListRef}
+            renderDay={renderDay}
+            handleScroll={handleScroll}
+            events={events}
+            timeOfDay={timeOfDay}
+          />
+        )}
+        {view === 'Week' && (
+          <WeekView
+            selectedDate = {selectedDate}
+            days={days}
+            flatListRef={flatListRef}
+            renderDay={renderDay}
+            handleScroll={handleScroll}
+            events={events}
+            timeOfDay={timeOfDay}
+            />
+        )}
       </View>
     </SafeAreaView>
   );
@@ -284,6 +408,23 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
   },
+
+  weekEventsContainer: {
+    flexDirection: 'row', // Align days horizontally
+    flex: 1,
+  },
+  dayColumn: {
+    flex: 1,
+    paddingLeft: 8,
+    borderLeftWidth: 1,
+    borderLeftColor: '#e0e0e0',
+  },
+  weekDayText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+
 });
 
 export default CalendarPage;
