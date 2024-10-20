@@ -15,7 +15,11 @@ import {
   addDays, 
   isSameDay, 
   startOfToday, 
-  subDays 
+  subDays, 
+  startOfMonth, 
+  endOfMonth, 
+  startOfWeek, 
+  endOfWeek 
 } from 'date-fns';
 
 interface Event {
@@ -184,6 +188,42 @@ const WeekView: React.FC<{
   );
 };
 
+const MonthView: React.FC<{
+  selectedDate: Date;
+  events: Event[];
+  handleDayPress:  (date: Date) => void;
+}> = ({ selectedDate, events, handleDayPress }) => {
+  const start = startOfWeek(startOfMonth(selectedDate));
+  const end = endOfWeek(endOfMonth(selectedDate));
+
+  const days: Date[] = [];
+  for(let day = start; day <= end; day = addDays(day, 1)){
+    days.push(day);
+  }
+
+  return (
+    <View style={styles.monthViewContainer}>
+      <View style = {styles.monthGrid}>
+        {days.map((day) => (
+          <TouchableOpacity
+            key = {day.toISOString()}
+            onPress={() => handleDayPress(day)}
+            style = {styles.dayCell}
+          >
+            <Text style={styles.dayNumber}>{day.getDate()}</Text>
+            {events
+              .filter(event => isSameDay(event.startTime, day))
+              .map(event => (
+                <Text key={event.id} style={styles.eventText}>
+                  {event.name}
+                </Text>
+              ))}
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  )
+}
 
 
 const CalendarPage: React.FC = () => {
@@ -313,6 +353,13 @@ const CalendarPage: React.FC = () => {
             timeOfDay={timeOfDay}
             />
         )}
+        {view === 'Month' && (
+          <MonthView
+            selectedDate = {selectedDate}
+            events={events}
+            handleDayPress={handleDayPress}
+            />
+        )}
       </View>
     </SafeAreaView>
   );
@@ -423,6 +470,30 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 8,
+  },
+
+  monthViewContainer: {
+    flex: 1,
+    padding: 10,
+  },
+
+  monthGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+
+  dayCell: {
+    width: '14.28%', // 7 days in a week
+    height: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderColor: '#e0e0e0',
+    borderWidth: 1,
+  },
+
+  dayNumber: {
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 
 });
