@@ -16,11 +16,15 @@ import {
   isSameDay, 
   startOfToday, 
   subDays, 
+  addMinutes,
   startOfMonth, 
   endOfMonth, 
   startOfWeek, 
   endOfWeek 
 } from 'date-fns';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { auth, db } from '@/config/firebaseConfig';
+import { router } from 'expo-router';
 
 interface Event {
   id: string;
@@ -28,6 +32,25 @@ interface Event {
   startTime: Date;
   endTime: Date;
 }
+interface Assignment {
+  id: string;
+  name: string;
+  dueDate: string;
+  className: string;
+  completed: boolean;
+  type: 'assignment';
+}
+
+interface Class {
+  id: string;
+  name: string;
+  startTime: string;
+  daysOfWeek: string[];
+  classType: string;
+
+  type: 'class';
+}
+type CombinedItem = Assignment | Class;
 
 const DayView: React.FC<{
   selectedDate: Date;
@@ -191,39 +214,68 @@ const WeekView: React.FC<{
 const MonthView: React.FC<{
   selectedDate: Date;
   events: Event[];
-  handleDayPress:  (date: Date) => void;
+  handleDayPress: (date: Date) => void;
 }> = ({ selectedDate, events, handleDayPress }) => {
   const start = startOfWeek(startOfMonth(selectedDate));
   const end = endOfWeek(endOfMonth(selectedDate));
 
   const days: Date[] = [];
-  for(let day = start; day <= end; day = addDays(day, 1)){
+  for (let day = start; day <= end; day = addDays(day, 1)) {
     days.push(day);
   }
 
+  const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
   return (
     <View style={styles.monthViewContainer}>
-      <View style = {styles.monthGrid}>
+      {/* Day Labels */}
+      <View style={styles.monthDayLabelsContainer}>
+        {dayLabels.map((label, index) => (
+          <Text key={index} style={styles.monthDayLabel}>
+            {label}
+          </Text>
+        ))}
+      </View>
+
+      {/* Month Grid */}
+      <View style={styles.monthGrid}>
         {days.map((day) => (
           <TouchableOpacity
-            key = {day.toISOString()}
+            key={day.toISOString()}
             onPress={() => handleDayPress(day)}
-            style = {styles.dayCell}
+            style={styles.monthDayCell}
           >
-            <Text style={styles.dayNumber}>{day.getDate()}</Text>
+            {/* Day Number with circular background for selected day */}
+            <View
+              style={[
+                styles.dayNumberContainer,
+                isSameDay(day, selectedDate) && styles.selectedDayNumberContainer,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.monthDayNumber,
+                  isSameDay(day, selectedDate) && styles.selectedDayNumber,
+                ]}
+              >
+                {day.getDate()}
+              </Text>
+            </View>
+
+            {/* Events for this day */}
             {events
-              .filter(event => isSameDay(event.startTime, day))
-              .map(event => (
-                <Text key={event.id} style={styles.eventText}>
-                  {event.name}
-                </Text>
+              .filter((event) => isSameDay(event.startTime, day))
+              .map((event) => (
+                <View key={event.id} style={styles.monthEventCard}>
+                  <Text style={styles.monthEventText}>{event.name}</Text>
+                </View>
               ))}
           </TouchableOpacity>
         ))}
       </View>
     </View>
-  )
-}
+  );
+};
 
 
 const CalendarPage: React.FC = () => {
@@ -233,6 +285,153 @@ const CalendarPage: React.FC = () => {
   const [timeOfDay, setTimeOfDay] = useState(new Date()); //added a current time state var - Henry
   const [days, setDays] = useState<Date[]>([]);
   const flatListRef = useRef<FlatList>(null);
+
+  const [items, setItems] = useState<Event[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+
+
+  //getting the combined events
+  const dayAbbreviations = ['Su', 'M', 'T', 'W', 'Th', 'F', 'Sa'];
+
+  const createClassDate = (day: string, time: string) => {
+    const today = new Date(); // Use current week
+    const dayIndex = dayAbbreviations.indexOf(day); // Get day index
+    console.log("Day index is")
+    console.log(dayIndex)
+    // Set the date to the desired day of the week
+    const classDate = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate() + ((7 + dayIndex - today.getDay()) % 7), // Adjust to the correct weekday
+      ...time.split(':').map(Number) // Set hours and minutes
+    );
+    return classDate;
+  };
+
+/**
+ * Converts an array of `Class` and `Assignment` objects into `Event` objects.
+ */
+const convertToEvents = (items: (Class | Assignment)[]): Event[] => {
+  const dayAbbreviations = ['Su', 'M', 'T', 'W', 'Th', 'F', 'Sa'];
+
+  return items.flatMap((item) => {
+    if (item.type === 'class') {
+      // Map each day in daysOfWeek to individual Event objects
+      return item.daysOfWeek.map((day) => {
+        const startTime = createClassDate(day, item.startTime);
+        const endTime = addMinutes(startTime, 60); // Assume 1-hour duration
+
+        return {
+          id: `${item.id}-${day}`,
+          name: item.name,
+          startTime,
+          endTime,
+        };
+      });
+    } else if (item.type === 'assignment') {
+      const startTime = new Date(item.dueDate);
+      return [
+        {
+          id: item.id,
+          name: item.name,
+          startTime,
+          endTime: startTime, // Assignments have the same start and end time
+        },
+      ];
+    }
+    return [];
+  });
+};
+
+const splitClassByDays = (classItem: Class) => {
+  // Map each day to a class instance, and return a flat array of class objects.
+  return classItem.daysOfWeek.map((day) => ({
+    ...classItem,
+    daysOfWeek: [day], // Ensure only a single day is included.
+  }));
+
+};
+  
+
+  const sortItems = (items: (Class | Assignment)[]): (Class | Assignment)[] => {
+    return items.sort((a, b) => {
+      let dateA: Date, dateB: Date;
+  
+      if (a.type === 'class') {
+        dateA = createClassDate(a.daysOfWeek[0], a.startTime);
+      } else {
+        dateA = new Date(a.dueDate);
+      }
+  
+      if (b.type === 'class') {
+        dateB = createClassDate(b.daysOfWeek[0], b.startTime);
+      } else {
+        dateB = new Date(b.dueDate);
+      }
+  
+      return dateA.getTime() - dateB.getTime(); // Sort by earliest date/time
+    });
+  };
+
+  const fetchItemsForNextWeek = async () => {
+    try {
+      const user = auth.currentUser;
+      if (!user) {
+        router.replace('/login');
+        return;
+      }
+
+      // Fetch classes
+      const classesQuery = query(collection(db, 'Classes'), where('UID', '==', user.uid));
+      const classSnapshot = await getDocs(classesQuery);
+      const fetchedClasses: Class[] = classSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        type: 'class',
+      })) as Class[];
+
+      // Fetch assignments
+      const assignmentsQuery = query(collection(db, 'Assignments'), where('UID', '==', user.uid));
+      const assignmentSnapshot = await getDocs(assignmentsQuery);
+      const fetchedAssignments: Assignment[] = assignmentSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        type: 'assignment',
+      })) as Assignment[];
+
+      // Combine and filter for the next 7 days
+      const combinedItems = sortItems(filterItemsForNextWeek([...fetchedClasses, ...fetchedAssignments]));
+      console.log("COMBINED ITEMSs")
+      console.log(combinedItems)
+      setItems(convertToEvents(combinedItems));
+    } catch (error) {
+      console.error('Error fetching items:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const filterItemsForNextWeek = (items: CombinedItem[]) => {
+    const today = new Date();
+    const next7Days = Array.from({ length: 7 }, (_, i) => new Date(today.getTime() + i * 86400000));
+    const dayAbbreviations = ['Su', 'M', 'T', 'W', 'Th', 'F', 'Sa'];
+
+    //console.log("test1")
+    return items.flatMap((item): CombinedItem[] => {
+        if (item.type === 'class') {
+          return splitClassByDays(item); // This returns an array of class objects
+        } else {
+          return [item]; // Wrap assignment in an array to maintain consistency
+        }
+      });
+  };
+
+  useEffect(() => {
+    if (items.length == 0){
+        fetchItemsForNextWeek();
+    }
+    
+  }, []);
 
   const events: Event[] = [
     {
@@ -339,7 +538,7 @@ const CalendarPage: React.FC = () => {
             flatListRef={flatListRef}
             renderDay={renderDay}
             handleScroll={handleScroll}
-            events={events}
+            events={items.filter(event => isSameDay(event.startTime, selectedDate))}
             timeOfDay={timeOfDay}
           />
         )}
@@ -350,16 +549,18 @@ const CalendarPage: React.FC = () => {
             flatListRef={flatListRef}
             renderDay={renderDay}
             handleScroll={handleScroll}
-            events={events}
+            events={items}
             timeOfDay={timeOfDay}
             />
         )}
         {view === 'Month' && (
+          <View style = {{height: '90%'}}>
           <MonthView
             selectedDate = {selectedDate}
-            events={events}
+            events={items}
             handleDayPress={handleDayPress}
             />
+            </View>
         )}
       </View>
     </SafeAreaView>
@@ -450,7 +651,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   eventText: {
-    color: 'white',
+    color: 'black',
     fontWeight: 'bold',
   },
   eventTime: {
@@ -503,6 +704,90 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
+
+  dayLabelsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 5,
+  },
+  dayLabel: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 12, // Adjust font size for day labels
+    fontWeight: 'bold',
+  },
+
+  monthDayNumber: {
+    fontSize: 14, // Adjusted font size for day numbers
+    fontWeight: 'bold',
+  },
+
+  monthViewContainer: {
+    flex: 1, // Ensure it takes up all available space
+    padding: 16,
+  },
+  monthDayLabelsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 5,
+  },
+  monthDayLabel: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    flex: 1,
+  },
+  monthGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  monthDayCell: {
+    width: '14.28%', // Approximately 1/7 of the width (7 days)
+    height: '40.0%', // Increase this to make the boxes taller
+    justifyContent: 'flex-start', // Align items to the start
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    padding: 4,
+  },
+
+  monthEventCard: {
+    backgroundColor: '#1e88e5',
+    borderRadius: 4,
+    padding: 4,
+    marginTop: 2,
+    marginBottom: 2,
+    width: '100%', // Make it take full width of the cell
+  },
+  monthEventText: {
+    color: 'white',
+    fontSize: 12,
+  },
+
+  selectedMonthDayCell: {
+    backgroundColor: 'red', // Circle background color for selected day
+    borderRadius: 100, // Makes the background circular
+  },
+
+  selectedDayNumber: {
+    color: 'white', // Text color for the selected day
+  },
+
+  selectedDayNumberContainer: {
+    backgroundColor: 'red', // Red circle for selected day
+  },
+  monthDayNumber1: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  dayNumberContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 40, // Size of the circle
+    height: 40,
+    borderRadius: 20, // Makes it a perfect circle
+  },
+
 
 });
 

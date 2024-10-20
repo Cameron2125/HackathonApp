@@ -20,7 +20,7 @@ interface Assignment {
 interface Class {
   id: string;
   name: string;
-  timeOfDay: string;
+  startTime: string;
   daysOfWeek: string[];
   classType: string;
   type: 'class';
