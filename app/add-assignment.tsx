@@ -1,7 +1,15 @@
-// app/add-assignment.tsx
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, SafeAreaView } from 'react-native';
-import { TextInput, Button, Title, HelperText, Portal, Provider } from 'react-native-paper';
+import {
+  TextInput,
+  Button,
+  Title,
+  HelperText,
+  Portal,
+  Provider,
+  Modal,
+  Text,
+} from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { auth, db } from '../config/firebaseConfig';
 import { collection, query, where, getDocs, addDoc } from 'firebase/firestore';
@@ -26,6 +34,9 @@ export default function AddAssignment() {
   const [error, setError] = useState<string | null>(null);
   const [classes, setClasses] = useState<Class[]>([]);
   const [isFormValid, setIsFormValid] = useState(false);
+  const [showSuggestedTimeModal, setShowSuggestedTimeModal] = useState(false);
+
+  const suggestedTime = '1:00 PM, Saturday, 19th October'; // Hardcoded for now
 
   const fetchClasses = async () => {
     try {
@@ -64,7 +75,7 @@ export default function AddAssignment() {
     try {
       const user = auth.currentUser;
       if (!user) {
-        router.replace('/login');
+        router.push('/');
         return;
       }
 
@@ -80,7 +91,7 @@ export default function AddAssignment() {
       });
 
       alert('Assignment added successfully!');
-      router.replace('/home');
+      router.push('/home');
     } catch (err: any) {
       setError(err.message);
     }
@@ -143,6 +154,18 @@ export default function AddAssignment() {
               hours={0}
               minutes={0}
             />
+
+            {/* Suggested Time Modal */}
+            <Modal
+              visible={showSuggestedTimeModal}
+              onDismiss={() => setShowSuggestedTimeModal(false)}
+              contentContainerStyle={styles.modalContent}
+            >
+              <Text style={styles.modalText}>
+                Suggested Time to Complete: {suggestedTime}
+              </Text>
+              <Button onPress={() => setShowSuggestedTimeModal(false)}>Close</Button>
+            </Modal>
           </Portal>
 
           <View style={styles.pickerContainer}>
@@ -181,6 +204,14 @@ export default function AddAssignment() {
           >
             Add Assignment
           </Button>
+
+          <Button
+            mode="outlined"
+            onPress={() => setShowSuggestedTimeModal(true)}
+            style={styles.button}
+          >
+            Show Suggested Work Time
+          </Button>
         </ScrollView>
       </SafeAreaView>
     </Provider>
@@ -217,4 +248,15 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 10,
   },
+  modalContent: {
+    backgroundColor: 'white',
+    padding: 20,
+    margin: 20,
+    borderRadius: 10,
+  },
+  modalText: {
+    fontSize: 18,
+    marginBottom: 10,
+  },
 });
+
