@@ -25,7 +25,7 @@ const AssignmentCard: React.FC<AssignmentCardProps> = ({ assignment, toggleCompl
 
   return (
     <Card style={styles.card}>
-      <Card.Title title={assignment.name} />
+      <Card.Title titleStyle = {styles.title} title={assignment.name} />
       <Card.Content>
         <Paragraph style={styles.text}>
           Due Date: {new Date(assignment.dueDate).toDateString()}
@@ -49,10 +49,16 @@ const AssignmentCard: React.FC<AssignmentCardProps> = ({ assignment, toggleCompl
 const styles = StyleSheet.create({
   card: {
     marginBottom: 12,
-    backgroundColor: '#fff',
+    backgroundColor: 'blue',
   },
-  text: { // Use consistent dark text color
+  title: {
+    fontSize: 20, // Increased font size
+    fontWeight: 'bold', // Bold font weight
+    color: '#1E1E1E', // Darker shade for better contrast
+  },
+  text: {
     fontSize: 16,
+    color: '#212121', // Dark grey
   },
   checkboxContainer: {
     flexDirection: 'row',

@@ -27,8 +27,8 @@ interface Event {
   name: string;
   startTime: Date;
   endTime: Date;
+  date: Date;
 }
-
 const DayView: React.FC<{
   selectedDate: Date;
   days: Date[];
@@ -46,6 +46,11 @@ const DayView: React.FC<{
   events,
   timeOfDay,
 }) => {
+  // Filter events based on the selected date
+  const filteredEvents = events.filter(event =>
+    isSameDay(event.startTime, selectedDate) // Assuming startTime is a Date object
+  );
+
   return (
     <>
       {/* Infinite Scrolling Days */}
@@ -83,14 +88,23 @@ const DayView: React.FC<{
 
           {/* Events Column */}
           <View style={styles.eventsColumn}>
-            {events.map((event) => (
-              <Card key={event.id} style={styles.eventCard}>
-                <Text style={styles.eventText}>{event.name}</Text>
-                <Text style={styles.eventTime}>
-                  {format(event.startTime, 'HH:mm')} - {format(event.endTime, 'HH:mm')}
-                </Text>
-              </Card>
-            ))}
+            {filteredEvents.map((event) => {
+              const startHour = event.startTime.getHours();
+              const startMinute = event.startTime.getMinutes();
+              const eventTop = (startHour + startMinute / 60) * 60; // Calculate the position based on time
+
+              return (
+                <Card
+                  key={event.id}
+                  style={[styles.eventCard, { top: eventTop }]} // Position the event based on start time
+                >
+                  <Text style={styles.eventText}>{event.name}</Text>
+                  <Text style={styles.eventTime}>
+                    {format(event.startTime, 'HH:mm')} - {format(event.endTime, 'HH:mm')}
+                  </Text>
+                </Card>
+              );
+            })}
             <View
               style={[
                 styles.currentTimeBar,
@@ -105,27 +119,24 @@ const DayView: React.FC<{
     </>
   );
 };
-
 const WeekView: React.FC<{
-  selectedDate: Date;
-  days: Date[];
+  selectedDate: Date; // The date representing the current week
+  days: Date[]; // The array of dates for the week
   flatListRef: React.RefObject<FlatList>;
   renderDay: ({ item }: { item: Date }) => JSX.Element;
   handleScroll: (event: any) => void;
-  events: Event[];
-  timeOfDay: Date;
+  events: Event[]; // List of all events
+  timeOfDay: Date; // Current time for display
 }> = ({
   selectedDate,
-  days,
   flatListRef,
   renderDay,
   handleScroll,
   events,
   timeOfDay,
 }) => {
-  // Filter the current week days (7 days) based on the selectedDate
-  const weekStart = selectedDate; // Start of the current week
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const weekStart = startOfWeek(selectedDate); // Get the start of the week
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // Create an array of days in the week
 
   return (
     <>
@@ -161,24 +172,42 @@ const WeekView: React.FC<{
             ))}
           </View>
 
-          {/* Events for each day */}
+          {/* Events for each day in the week */}
           <View style={styles.weekEventsContainer}>
             {weekDays.map((day) => (
               <View key={day.toISOString()} style={styles.dayColumn}>
                 <Text style={styles.weekDayText}>{format(day, 'EEE d')}</Text>
+                
+                {/* Filter and display events for the current day */}
                 {events
-                  .filter(
-                    (event) =>
-                      isSameDay(event.startTime, day) || isSameDay(event.endTime, day)
-                  )
-                  .map((event) => (
-                    <Card key={event.id} style={styles.eventCard}>
-                      <Text style={styles.eventText}>{event.name}</Text>
-                      <Text style={styles.eventTime}>
-                        {format(event.startTime, 'HH:mm')} - {format(event.endTime, 'HH:mm')}
-                      </Text>
-                    </Card>
-                  ))}
+                  .filter(event => isSameDay(event.startTime, day)) // Filter events by startTime for this day
+                  .map(event => {
+                    const startHour = event.startTime.getHours();
+                    const startMinute = event.startTime.getMinutes();
+                    const eventTop = (startHour + startMinute / 60) * 60; // Calculate position based on time
+
+                    return (
+                      <Card
+                        key={event.id}
+                        style={[styles.eventCard, { top: eventTop }]} // Position the event based on start time
+                      >
+                        <Text style={styles.eventText}>{event.name}</Text>
+                        <Text style={styles.eventTime}>
+                          {format(event.startTime, 'HH:mm')} - {format(event.endTime, 'HH:mm')}
+                        </Text>
+                      </Card>
+                    );
+                  })}
+
+                {/* Current Time Indicator */}
+                <View
+                  style={[
+                    styles.currentTimeBar,
+                    {
+                      top: (timeOfDay.getHours() + timeOfDay.getMinutes() / 60) * 60,
+                    },
+                  ]}
+                />
               </View>
             ))}
           </View>
@@ -191,39 +220,70 @@ const WeekView: React.FC<{
 const MonthView: React.FC<{
   selectedDate: Date;
   events: Event[];
-  handleDayPress:  (date: Date) => void;
+  handleDayPress: (date: Date) => void;
 }> = ({ selectedDate, events, handleDayPress }) => {
   const start = startOfWeek(startOfMonth(selectedDate));
   const end = endOfWeek(endOfMonth(selectedDate));
 
   const days: Date[] = [];
-  for(let day = start; day <= end; day = addDays(day, 1)){
+  for (let day = start; day <= end; day = addDays(day, 1)) {
     days.push(day);
   }
 
+  const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
   return (
     <View style={styles.monthViewContainer}>
-      <View style = {styles.monthGrid}>
+      {/* Day Labels */}
+      <View style={styles.monthDayLabelsContainer}>
+        {dayLabels.map((label, index) => (
+          <Text key={index} style={styles.monthDayLabel}>
+            {label}
+          </Text>
+        ))}
+      </View>
+
+      {/* Month Grid */}
+      <View style={styles.monthGrid}>
         {days.map((day) => (
           <TouchableOpacity
-            key = {day.toISOString()}
+            key={day.toISOString()}
             onPress={() => handleDayPress(day)}
-            style = {styles.dayCell}
+            style={styles.monthDayCell}
           >
-            <Text style={styles.dayNumber}>{day.getDate()}</Text>
+            {/* Day Number with circular background for selected day */}
+            <View
+              style={[
+                styles.dayNumberContainer,
+                isSameDay(day, selectedDate) && styles.selectedDayNumberContainer,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.monthDayNumber,
+                  isSameDay(day, selectedDate) && styles.selectedDayNumber,
+                ]}
+              >
+                {day.getDate()}
+              </Text>
+            </View>
+
+            {/* Events for this day */}
             {events
-              .filter(event => isSameDay(event.startTime, day))
-              .map(event => (
-                <Text key={event.id} style={styles.eventText}>
-                  {event.name}
-                </Text>
+              .filter((event) => isSameDay(event.startTime, day))
+              .map((event) => (
+                <View key={event.id} style={styles.monthEventCard}>
+                  <Text style={styles.monthEventText}>{event.name}</Text>
+                </View>
               ))}
           </TouchableOpacity>
         ))}
       </View>
     </View>
-  )
-}
+  );
+};
+
+
 
 
 const CalendarPage: React.FC = () => {
@@ -238,14 +298,16 @@ const CalendarPage: React.FC = () => {
     {
       id: '1',
       name: 'Math Class',
-      startTime: new Date(selectedDate.setHours(9, 0, 0, 0)),
-      endTime: new Date(selectedDate.setHours(10, 0, 0, 0)),
+      startTime: new Date('2024-10-20T09:00:00'), // Use hardcoded or cloned Date
+      endTime: new Date('2024-10-20T10:00:00'),
+      date: new Date('2024-10-20'),
     },
     {
       id: '2',
       name: 'Lunch Break',
-      startTime: new Date(selectedDate.setHours(12, 0, 0, 0)),
-      endTime: new Date(selectedDate.setHours(13, 0, 0, 0)),
+      startTime: new Date('2024-10-21T12:00:00'),
+      endTime: new Date('2024-10-21T13:00:00'),
+      date: new Date('2024-10-21'),
     },
   ];
 
@@ -355,11 +417,13 @@ const CalendarPage: React.FC = () => {
             />
         )}
         {view === 'Month' && (
+          <View style={{ height: '100%' }}> 
           <MonthView
-            selectedDate = {selectedDate}
+            selectedDate={selectedDate}
             events={events}
             handleDayPress={handleDayPress}
-            />
+          />
+        </View>
         )}
       </View>
     </SafeAreaView>
@@ -450,7 +514,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   eventText: {
-    color: 'white',
+    color: 'black',
     fontWeight: 'bold',
   },
   eventTime: {
@@ -503,6 +567,90 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
+
+  dayLabelsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 5,
+  },
+  dayLabel: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 12, // Adjust font size for day labels
+    fontWeight: 'bold',
+  },
+
+  monthDayNumber: {
+    fontSize: 14, // Adjusted font size for day numbers
+    fontWeight: 'bold',
+  },
+
+  monthViewContainer: {
+    flex: 1, // Ensure it takes up all available space
+    padding: 16,
+  },
+  monthDayLabelsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 5,
+  },
+  monthDayLabel: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    flex: 1,
+  },
+  monthGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  monthDayCell: {
+    width: '14.28%', // Approximately 1/7 of the width (7 days)
+    height: '40.0%', // Increase this to make the boxes taller
+    justifyContent: 'flex-start', // Align items to the start
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    padding: 4,
+  },
+
+  monthEventCard: {
+    backgroundColor: '#1e88e5',
+    borderRadius: 4,
+    padding: 4,
+    marginTop: 2,
+    marginBottom: 2,
+    width: '100%', // Make it take full width of the cell
+  },
+  monthEventText: {
+    color: 'white',
+    fontSize: 12,
+  },
+
+  selectedMonthDayCell: {
+    backgroundColor: 'red', // Circle background color for selected day
+    borderRadius: 100, // Makes the background circular
+  },
+
+  selectedDayNumber: {
+    color: 'white', // Text color for the selected day
+  },
+
+  selectedDayNumberContainer: {
+    backgroundColor: 'red', // Red circle for selected day
+  },
+  monthDayNumber1: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  dayNumberContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 40, // Size of the circle
+    height: 40,
+    borderRadius: 20, // Makes it a perfect circle
+  },
+
 
 });
 
