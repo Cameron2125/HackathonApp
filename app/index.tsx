@@ -1,6 +1,5 @@
-// app/index.js
 import React, { useState } from 'react';
-import { View, StyleSheet, Image } from 'react-native';
+import { View, StyleSheet, KeyboardAvoidingView, ScrollView, Platform } from 'react-native'; // Added KeyboardAvoidingView and ScrollView
 import { TextInput, Button, Text, Title, Caption } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { auth } from '../config/firebaseConfig';
@@ -11,7 +10,6 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  
 
   const handleLogin = async () => {
     try {
@@ -27,41 +25,45 @@ export default function LoginScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <Title style={styles.title}>Scheduler</Title>
-      <Caption style={styles.caption}>Manage your time efficiently</Caption>
-      
-      <TextInput
-        label="Email"
-        value={email}
-        onChangeText={setEmail}
-        style={styles.input}
-        keyboardType="email-address"
-        autoCapitalize="none"
-      />
-      <TextInput
-        label="Password"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        style={styles.input}
-      />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'} // Adjust the layout when the keyboard is open
+    >
+      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        <Title style={styles.title}>Scheduler</Title>
+        <Caption style={styles.caption}>Manage your time efficiently</Caption>
+        
+        <TextInput
+          label="Email"
+          value={email}
+          onChangeText={setEmail}
+          style={styles.input}
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
+        <TextInput
+          label="Password"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          style={styles.input}
+        />
+        {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <Button mode="contained" onPress={handleLogin} style={styles.button}>
-        Login
-      </Button>
-      <Button onPress={handleSignupRedirect} style={styles.linkButton}>
-        Create an Account
-      </Button>
-    </View>
+        <Button mode="contained" onPress={handleLogin} style={styles.button}>
+          Login
+        </Button>
+        <Button onPress={handleSignupRedirect} style={styles.linkButton}>
+          Create an Account
+        </Button>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
@@ -78,11 +80,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 30,
     color: '#666',
-  },
-  logo: {
-    width: 100,
-    height: 100,
-    marginBottom: 20,
   },
   input: {
     width: '100%',
